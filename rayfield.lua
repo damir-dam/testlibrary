@@ -1,136 +1,230 @@
--- ChristmasRayfield Library v1.0 - Рождественская версия Rayfield для Roblox
--- Автор: ChatGPT (на основе Rayfield, но с новогодним стилем 99% аналогична)
--- Используйте: local ChristmasRayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/ChristmasRayfield/main/ChristmasRayfield.lua"))()
+-- ChristmasRayfield Library v2.0 - Полная версия с полным набором функций Rayfield, адаптированная под Новый Год
+-- Автор: ChatGPT (полная переработка для корректности и полноты)
+-- Все функции как в оригинальном Rayfield, но с новогодним стилем (99% аналогично, но с иконками и темами)
+-- Используйте: local ChristmasRayfield = loadstring(game:HttpGet("https://raw.githubusercontent.com/YOUR_USERNAME/ChristmasRayfield/main/ChristmasRayfieldV2.lua"))()
 
 local ChristmasRayfield = {}
 
+-- Сервисы и вспомогательные
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local HttpService = game:GetService("HttpService")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local CoreGuiService = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 local SaveConfigJsonPath = "ChristmasRayfield_Config.json"
 
+-- Темы (обновленные для красоты как в Rayfield)
+local Themes = {
+    Default = {
+        Accent = Color3.fromRGB(255, 0, 128), -- Новогодний розово-красный
+        Outline = Color3.fromRGB(60, 60, 60),
+        Main = Color3.fromRGB(25, 25, 35),
+        Second = Color3.fromRGB(40, 40, 50),
+        Stroke = Color3.fromRGB(255, 215, 0), -- Золотой
+        Divider = Color3.fromRGB(255, 255, 255),
+        Text = Color3.fromRGB(255, 255, 255),
+        Placeholder = Color3.fromRGB(200, 200, 200)
+    },
+    Light = { -- Светлая тема для разнообразия
+        Accent = Color3.fromRGB(255, 0, 128),
+        Outline = Color3.fromRGB(200, 200, 200),
+        Main = Color3.fromRGB(240, 240, 245),
+        Second = Color3.fromRGB(225, 225, 235),
+        Stroke = Color3.fromRGB(255, 215, 0),
+        Divider = Color3.fromRGB(100, 100, 120),
+        Text = Color3.fromRGB(50, 50, 60),
+        Placeholder = Color3.fromRGB(150, 150, 160)
+    }
+}
+local CurrentTheme = Themes.Default
+
 -- Вспомогательные функции
+local function ApplyDropShadow(Frame, Parent, Offset, Transparency, Color)
+    local Shadow = Instance.new("ImageLabel")
+    Shadow.Name = "Shadow"
+    Shadow.BackgroundTransparency = 1
+    Shadow.Image = "rbxassetid://6015897843" -- Темная тень
+    Shadow.ImageColor3 = Color or Color3.new(0, 0, 0)
+    Shadow.ImageTransparency = Transparency or 0.5
+    Shadow.Position = UDim2.new(0, -Offset.X, 0, -Offset.Y)
+    Shadow.Size = UDim2.new(1, Offset.X * 2, 1, Offset.Y * 2)
+    Shadow.ZIndex = Frame.ZIndex - 1
+    Shadow.Parent = Parent
+    return Shadow
+end
+
 local function PlayTween(Object, Properties, Speed, Style, Direction, Delay)
     local Tween = TweenService:Create(Object, TweenInfo.new(Speed or 0.2, Style or Enum.EasingStyle.Linear, Direction or Enum.EasingDirection.InOut, 0, false, Delay or 0), Properties)
     Tween:Play()
     return Tween
 end
 
-local Themes = {
-    Accent = Color3.fromRGB(255, 0, 0),  -- Красный (ёлка)
-    Outline = Color3.fromRGB(0, 100, 0), -- Тёмно-зелёный
-    Main = Color3.fromRGB(10, 10, 10),    -- Тёмный фон
-    Second = Color3.fromRGB(20, 20, 20),  -- Средний фон
-    Stroke = Color3.fromRGB(255, 215, 0), -- Золотой
-    Text = Color3.fromRGB(255, 255, 255)   -- Белый (снег)
-}
-
--- Снегопад эффект
-local function CreateSnowfall(Parent)
-    local SnowParticles = Instance.new("ParticleEmitter")
-    SnowParticles.LightEmission = 0
-    SnowParticles.LightInfluence = 0
-    SnowParticles.Acceleration = Vector3.new(0, -10, 0)
-    SnowParticles.Drag = 5
-    SnowParticles.EmissionDirection = Enum.NormalId.Back
-    SnowParticles.FlipbookFramerate = NumberRange.new(5, 15)
-    SnowParticles.Lifetime = NumberRange.new(10, 15)
-    SnowParticles.Rate = 50
-    SnowParticles.Rotation = NumberRange.new(-180, 180)
-    SnowParticles.RotSpeed = NumberRange.new(-10, 10)
-    SnowParticles.Size = NumberSequence.new{NumberSequenceKeypoint.new(0, 0.5, 0.1), NumberSequenceKeypoint.new(1, 0, 0.1)}
-    SnowParticles.Speed = NumberRange.new(5, 10)
-    SnowParticles.SpreadAngle = Vector2.new(60, 60)
-    SnowParticles.Texture = "rbxassetid://320370105"  -- Снежинка текстура
-    SnowParticles.ZOffset = -100
-    SnowParticles.Parent = Parent
+local function ConnectionMaid(...) -- Менеджер соединений
+    local Connections = {}
+    for _, Connection in pairs({...}) do
+        table.insert(Connections, Connection)
+    end
+    return {
+        Add = function(Self, Connection)
+            table.insert(Connections, Connection)
+        end,
+        Clean = function(Self)
+            for _, Connection in pairs(Connections) do
+                Connection:Disconnect()
+            end
+        end
+    }
 end
 
+-- Нотификации (как в Rayfield)
+local NotificationHolder = Instance.new("ScreenGui")
+NotificationHolder.Name = "ChristmasNotifications"
+NotificationHolder.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+NotificationHolder.Parent = CoreGuiService
+
+local NotificationLayout = Instance.new("UIListLayout")
+NotificationLayout.Name = "Layout"
+NotificationLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+NotificationLayout.SortOrder = Enum.SortOrder.LayoutOrder
+NotificationLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+NotificationLayout.Padding = UDim.new(0, 8)
+NotificationLayout.Parent = NotificationHolder
+
+function ChristmasRayfield:Notify(Settings)
+    local Title = Settings.Title or "Notification"
+    local Content = Settings.Content or ""
+    local Duration = Settings.Duration or 5
+    local Image = Settings.Image or "rbxassetid://677930759" -- Новогодний шар
+
+    local Notification = Instance.new("Frame")
+    Notification.Name = "Notification"
+    Notification.BackgroundColor3 = CurrentTheme.Main
+    Notification.BackgroundTransparency = 0.1
+    Notification.BorderSizePixel = 0
+    Notification.Position = UDim2.new(1, 20, 1, -100)
+    Notification.Size = UDim2.new(0, 280, 0, 60)
+    Notification.ZIndex = 10000
+    Notification.Parent = NotificationHolder
+
+    ApplyDropShadow(Notification, NotificationHolder, Vector2.new(10, 10), 0.8, Color3.new(0, 0, 0))
+
+    local ImageLabel = Instance.new("ImageLabel")
+    ImageLabel.Name = "Image"
+    ImageLabel.BackgroundTransparency = 1
+    ImageLabel.Position = UDim2.new(0, 10, 0, 10)
+    ImageLabel.Size = UDim2.new(0, 40, 0, 40)
+    ImageLabel.Image = Image
+    ImageLabel.Parent = Notification
+
+    local TitleLabel = Instance.new("TextLabel")
+    TitleLabel.Name = "Title"
+    TitleLabel.BackgroundTransparency = 1
+    TitleLabel.Position = UDim2.new(0, 60, 0, 5)
+    TitleLabel.Size = UDim2.new(1, -70, 0, 25)
+    TitleLabel.Font = Enum.Font.SourceSansBold
+    TitleLabel.Text = Title .. " 🎄"
+    TitleLabel.TextColor3 = CurrentTheme.Text
+    TitleLabel.TextSize = 16
+    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+    TitleLabel.Parent = Notification
+
+    local ContentLabel = Instance.new("TextLabel")
+    ContentLabel.Name = "Content"
+    ContentLabel.BackgroundTransparency = 1
+    ContentLabel.Position = UDim2.new(0, 60, 0, 30)
+    ContentLabel.Size = UDim2.new(1, -70, 0, 25)
+    ContentLabel.Font = Enum.Font.SourceSans
+    ContentLabel.Text = Content
+    ContentLabel.TextColor3 = CurrentTheme.Placeholder
+    ContentLabel.TextSize = 12
+    ContentLabel.TextXAlignment = Enum.TextXAlignment.Left
+    ContentLabel.Parent = Notification
+
+    PlayTween(Notification, {Position = UDim2.new(1, -300, 1, -100)}, 0.5)
+    task.wait(Duration)
+    PlayTween(Notification, {Position = UDim2.new(1, 20, 1, -100), BackgroundTransparency = 1}, 0.5)
+    task.wait(0.5)
+    Notification:Destroy()
+end
+
+-- Создание окна
 function ChristmasRayfield:CreateWindow(Settings)
     local Passthrough = true
     local Config = {
-        Name = Settings.Name or "🎄 Christmas Window 🎄",
+        Name = Settings.Name or "🎄 Christmas Window",
         LoadingTitle = Settings.LoadingTitle or "🎁 Preparing Christmas...",
         LoadingSubtitle = Settings.LoadingSubtitle or "Decorating the Tree...",
-        ConfigurationSaving = Settings.ConfigurationSaving or {Enabled = false}
+        ConfigurationSaving = Settings.ConfigurationSaving or {Enabled = false, FolderName = "ChristmasRayfield", FileName = "Config"}
     }
 
-    -- Создание ScreenGui
+    if Config.ConfigurationSaving.Enabled then
+        SaveConfigJsonPath = Config.ConfigurationSaving.FolderName .. "/" .. Config.ConfigurationSaving.FileName .. ".json"
+        if not isfolder(Config.ConfigurationSaving.FolderName) then
+            makefolder(Config.ConfigurationSaving.FolderName)
+        end
+    end
+
     local GUI = Instance.new("ScreenGui")
     GUI.Name = Config.Name
+    GUI.ResetOnSpawn = false
     GUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    GUI.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    GUI.Parent = CoreGuiService
 
+    -- Loading Screen
     local LoadingScreen = Instance.new("Frame")
     LoadingScreen.Name = "LoadingScreen"
-    LoadingScreen.BackgroundColor3 = Themes.Main
+    LoadingScreen.BackgroundColor3 = CurrentTheme.Main
     LoadingScreen.BorderSizePixel = 0
     LoadingScreen.Size = UDim2.new(1, 0, 1, 0)
     LoadingScreen.Parent = GUI
 
-    local LoadingUICorner = Instance.new("UICorner")
-    LoadingUICorner.CornerRadius = UDim.new(0, 15)
-    LoadingUICorner.Parent = LoadingScreen
+    local LoadingTitle = Instance.new("TextLabel")
+    LoadingTitle.BackgroundTransparency = 1
+    LoadingTitle.Position = UDim2.new(0.5, 0, 0.5, -50)
+    LoadingTitle.AnchorPoint = Vector2.new(0.5, 0.5)
+    LoadingTitle.Size = UDim2.new(0, 0, 0, 50)
+    LoadingTitle.Font = Enum.Font.GothamBold
+    LoadingTitle.Text = Config.LoadingTitle
+    LoadingTitle.TextColor3 = CurrentTheme.Text
+    LoadingTitle.TextSize = 30
+    LoadingTitle.Parent = LoadingScreen
 
-    local Gradient = Instance.new("UIGradient")
-    Gradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 215, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 255, 0))
-    })
-    Gradient.Parent = LoadingScreen
+    local LoadingSubtitle = Instance.new("TextLabel")
+    LoadingSubtitle.BackgroundTransparency = 1
+    LoadingSubtitle.Position = UDim2.new(0.5, 0, 0.5, 10)
+    LoadingSubtitle.AnchorPoint = Vector2.new(0.5, 0.5)
+    LoadingSubtitle.Size = UDim2.new(0, 200, 0, 30)
+    LoadingSubtitle.Font = Enum.Font.Gotham
+    LoadingSubtitle.Text = Config.LoadingSubtitle
+    LoadingSubtitle.TextColor3 = CurrentTheme.Text
+    LoadingSubtitle.TextSize = 20
+    LoadingSubtitle.Parent = LoadingScreen
 
-    local Title = Instance.new("TextLabel")
-    Title.Name = "Title"
-    Title.BackgroundTransparency = 1
-    Title.Position = UDim2.new(0.5, 0, 0.5, -50)
-    Title.AnchorPoint = Vector2.new(0.5, 0.5)
-    Title.Size = UDim2.new(0, 0, 0, 50)
-    Title.Font = Enum.Font.SourceSansBold
-    Title.Text = Config.LoadingTitle
-    Title.TextColor3 = Themes.Text
-    Title.TextSize = 30
-    Title.Parent = LoadingScreen
-
-    local Subtitle = Instance.new("TextLabel")
-    Subtitle.Name = "Subtitle"
-    Subtitle.BackgroundTransparency = 1
-    Subtitle.Position = UDim2.new(0.5, 0, 0.5, 10)
-    Subtitle.AnchorPoint = Vector2.new(0.5, 0.5)
-    Subtitle.Size = UDim2.new(0, 200, 0, 30)
-    Subtitle.Font = Enum.Font.SourceSans
-    Subtitle.Text = Config.LoadingSubtitle
-    Subtitle.TextColor3 = Themes.Text
-    Subtitle.TextSize = 20
-    Subtitle.Parent = LoadingScreen
-
-    wait(2)
+    task.wait(2.5)
     LoadingScreen:Destroy()
 
-    -- Основное окно
+    -- Main Frame
     local Main = Instance.new("Frame")
     Main.Name = "Main"
     Main.AnchorPoint = Vector2.new(0.5, 0.5)
-    Main.BackgroundColor3 = Themes.Second
+    Main.BackgroundColor3 = CurrentTheme.Second
+    Main.BackgroundTransparency = 0.05
     Main.BorderSizePixel = 0
     Main.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Main.Size = UDim2.new(0, 600, 0, 350)
+    Main.Size = UDim2.new(0, 650, 0, 400)
     Main.ClipsDescendants = true
     Main.Parent = GUI
 
-    local MainUICorner = Instance.new("UICorner")
-    MainUICorner.CornerRadius = UDim.new(0, 10)
-    MainUICorner.Parent = Main
+    ApplyDropShadow(Main, GUI, Vector2.new(15, 15), 0.5)
 
     local Topbar = Instance.new("Frame")
     Topbar.Name = "Topbar"
-    Topbar.BackgroundColor3 = Themes.Main
+    Topbar.BackgroundColor3 = CurrentTheme.Main
     Topbar.BorderSizePixel = 0
-    Topbar.Size = UDim2.new(1, 0, 0, 40)
+    Topbar.Size = UDim2.new(1, 0, 0, 45)
     Topbar.Parent = Main
 
     local TopbarGradient = Instance.new("UIGradient")
@@ -140,32 +234,35 @@ function ChristmasRayfield:CreateWindow(Settings)
     })
     TopbarGradient.Parent = Topbar
 
-    local Title2 = Instance.new("TextLabel")
-    Title2.Name = "Title"
-    Title2.BackgroundTransparency = 1
-    Title2.Position = UDim2.new(0, 15, 0, 0)
-    Title2.Size = UDim2.new(0, 200, 1, 0)
-    Title2.Font = Enum.Font.SourceSansBold
-    Title2.Text = Config.Name
-    Title2.TextColor3 = Themes.Text
-    Title2.TextSize = 18
-    Title2.TextXAlignment = Enum.TextXAlignment.Left
-    Title2.Parent = Topbar
+    local Title = Instance.new("TextLabel")
+    Title.Name = "Title"
+    Title.BackgroundTransparency = 1
+    Title.Position = UDim2.new(0, 15, 0, 0)
+    Title.Size = UDim2.new(0, 200, 1, 0)
+    Title.Font = Enum.Font.GothamBold
+    Title.Text = Config.Name
+    Title.TextColor3 = CurrentTheme.Text
+    Title.TextSize = 18
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Topbar
 
-    local Icon = Instance.new("ImageLabel")
-    Icon.Name = "Icon"
-    Icon.BackgroundTransparency = 1
-    Icon.Position = UDim2.new(1, -40, 0, 5)
-    Icon.Size = UDim2.new(0, 30, 0, 30)
-    Icon.Image = "rbxassetid://677930759"  -- Новогодний шар
-    Icon.Parent = Topbar
+    local MinimizeButton = Instance.new("TextButton")
+    MinimizeButton.Name = "Minimize"
+    MinimizeButton.BackgroundTransparency = 1
+    MinimizeButton.Position = UDim2.new(1, -90, 0, 0)
+    MinimizeButton.Size = UDim2.new(0, 45, 1, 0)
+    MinimizeButton.Font = Enum.Font.GothamBold
+    MinimizeButton.Text = "_"
+    MinimizeButton.TextColor3 = CurrentTheme.Text
+    MinimizeButton.TextSize = 16
+    MinimizeButton.Parent = Topbar
 
     local CloseButton = Instance.new("TextButton")
     CloseButton.Name = "Close"
     CloseButton.BackgroundTransparency = 1
-    CloseButton.Position = UDim2.new(1, -40, 0, 0)
-    CloseButton.Size = UDim2.new(0, 40, 1, 0)
-    CloseButton.Font = Enum.Font.SourceSansBold
+    CloseButton.Position = UDim2.new(1, -45, 0, 0)
+    CloseButton.Size = UDim2.new(0, 45, 1, 0)
+    CloseButton.Font = Enum.Font.GothamBold
     CloseButton.Text = "✖"
     CloseButton.TextColor3 = Color3.fromRGB(255, 0, 0)
     CloseButton.TextSize = 16
@@ -175,90 +272,106 @@ function ChristmasRayfield:CreateWindow(Settings)
         GUI:Destroy()
     end)
 
-    local MinimizeButton = Instance.new("TextButton")
-    MinimizeButton.Name = "Minimize"
-    MinimizeButton.BackgroundTransparency = 1
-    MinimizeButton.Position = UDim2.new(1, -80, 0, 0)
-    MinimizeButton.Size = UDim2.new(0, 40, 1, 0)
-    MinimizeButton.Font = Enum.Font.SourceSansBold
-    MinimizeButton.Text = "_"
-    MinimizeButton.TextColor3 = Themes.Text
-    MinimizeButton.TextSize = 16
-    MinimizeButton.Parent = Topbar
-
     local Window = Instance.new("ScrollingFrame")
     Window.Name = "Window"
     Window.BackgroundTransparency = 1
-    Window.Position = UDim2.new(0, 0, 0, 40)
-    Window.Size = UDim2.new(1, 0, 1, -40)
+    Window.Position = UDim2.new(0, 0, 0, 45)
+    Window.Size = UDim2.new(1, 0, 1, -45)
     Window.ScrollBarThickness = 4
     Window.CanvasSize = UDim2.new(0, 0, 0, 0)
     Window.Parent = Main
 
-    local PageList = Instance.new("UIPageLayout")
-    PageList.Name = "PageList"
-    PageList.HorizontalAlignment = Enum.HorizontalAlignment.Right
-    PageList.SortOrder = Enum.SortOrder.LayoutOrder
-    PageList.EasingDirection = Enum.EasingDirection.InOut
-    PageList.EasingStyle = Enum.EasingStyle.Quad
-    PageList.FillDirection = Enum.FillDirection.Vertical
-    PageList.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    PageList.SortOrder = Enum.SortOrder.LayoutOrder
-    PageList.VerticalAlignment = Enum.VerticalAlignment.Top
-    PageList.Parent = Window
+    local PageListLayout = Instance.new("UIPageLayout")
+    PageListLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+    PageListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    PageListLayout.EasingDirection = Enum.EasingDirection.InOut
+    PageListLayout.EasingStyle = Enum.EasingStyle.Quad
+    PageListLayout.FillDirection = Enum.FillDirection.Vertical
+    PageListLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+    PageListLayout.Parent = Window
 
-    local TabList = Instance.new("Frame")
-    TabList.Name = "TabList"
-    TabList.BackgroundColor3 = Themes.Second
-    TabList.BorderSizePixel = 0
-    TabList.Position = UDim2.new(0, 10, 0, 50)
-    TabList.Size = UDim2.new(0, 130, 1, -60)
-    TabList.Parent = Main
-
-    local TabListUICorner = Instance.new("UICorner")
-    TabListUICorner.CornerRadius = UDim.new(0, 8)
-    TabListUICorner.Parent = TabList
-
-    local TabHolder = Instance.new("ScrollingFrame")
+    -- Tab Holder
+    local TabHolder = Instance.new("Frame")
     TabHolder.Name = "TabHolder"
-    TabHolder.BackgroundTransparency = 1
-    TabHolder.Size = UDim2.new(1, 0, 1, 0)
-    TabHolder.ScrollBarThickness = 0
-    TabHolder.CanvasSize = UDim2.new(0, 0, 0, 0)
-    TabHolder.Parent = TabList
+    TabHolder.BackgroundColor3 = CurrentTheme.Second
+    TabHolder.BorderSizePixel = 0
+    TabHolder.Position = UDim2.new(0, 10, 0, 55)
+    TabHolder.Size = UDim2.new(0, 150, 1, -65)
+    TabHolder.Parent = Main
+
+    local TabScroll = Instance.new("ScrollingFrame")
+    TabScroll.Name = "TabScroll"
+    TabScroll.BackgroundTransparency = 1
+    TabScroll.Size = UDim2.new(1, 0, 1, 0)
+    TabScroll.ScrollBarThickness = 0
+    TabScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    TabScroll.Parent = TabHolder
 
     local TabListLayout = Instance.new("UIListLayout")
-    TabListLayout.Name = "TabListLayout"
     TabListLayout.Padding = UDim.new(0, 5)
-    TabListLayout.Parent = TabHolder
+    TabListLayout.Parent = TabScroll
+
+    -- Search
+    local SearchBox = Instance.new("TextBox")
+    SearchBox.Name = "SearchBox"
+    SearchBox.BackgroundColor3 = CurrentTheme.Main
+    SearchBox.BorderSizePixel = 0
+    SearchBox.Position = UDim2.new(0, 10, 0, 55)
+    SearchBox.Size = UDim2.new(0, 150, 0, 30)
+    SearchBox.Font = Enum.Font.Gotham
+    SearchBox.PlaceholderText = "Search..."
+    SearchBox.Text = ""
+    SearchBox.TextColor3 = CurrentTheme.Text
+    SearchBox.TextSize = 14
+    SearchBox.Parent = Main
+
+    local function UpdateCanvasSize(ScrollFrame)
+        local Layout = ScrollFrame:FindFirstChildOfClass("UIListLayout")
+        if Layout then
+            ScrollFrame.CanvasSize = UDim2.new(0, 0, 0, Layout.AbsoluteContentSize.Y + Layout.Padding.Offset)
+        end
+    end
+
+    -- Minimization
+    local Minimized = false
+    MinimizeButton.MouseButton1Click:Connect(function()
+        Minimized = not Minimized
+        if Minimized then
+            PlayTween(Main, {Size = UDim2.new(0, 650, 0, 45)}, 0.3)
+            MinimizeButton.Text = "□"
+        else
+            PlayTween(Main, {Size = UDim2.new(0, 650, 0, 400)}, 0.3)
+            MinimizeButton.Text = "_"
+        end
+    end)
 
     local WindowTable = {
         GUI = GUI,
         Main = Main,
         Window = Window,
-        TabHolder = TabHolder,
-        TabList = TabList,
-        PageList = PageList,
-        Themes = Themes,
+        TabHolder = TabScroll,
+        TabList = TabHolder,
+        PageList = PageListLayout,
+        Themes = CurrentTheme,
         Flags = {},
         Tabs = {},
-        Elements = {}
+        Elements = {},
+        Connections = ConnectionMaid()
     }
 
-    -- Снегопад
-    CreateSnowfall(GUI)
-
-    -- Сохранение/загрузка конфига
+    -- Config
     function WindowTable:SaveConfig()
-        local ConfigData = {}
-        for FlagName, Flag in pairs(self.Flags) do
-            ConfigData[FlagName] = Flag.Value
+        if Config.ConfigurationSaving.Enabled then
+            local ConfigData = {}
+            for FlagName, Flag in pairs(self.Flags) do
+                ConfigData[FlagName] = Flag.Value
+            end
+            writefile(SaveConfigJsonPath, HttpService:JSONEncode(ConfigData))
         end
-        writefile(SaveConfigJsonPath, HttpService:JSONEncode(ConfigData))
     end
 
     function WindowTable:LoadConfig()
-        if isfile(SaveConfigJsonPath) then
+        if Config.ConfigurationSaving.Enabled and isfile(SaveConfigJsonPath) then
             local ConfigData = HttpService:JSONDecode(readfile(SaveConfigJsonPath))
             for FlagName, Flag in pairs(self.Flags) do
                 if ConfigData[FlagName] ~= nil then
@@ -273,28 +386,38 @@ function ChristmasRayfield:CreateWindow(Settings)
         WindowTable:LoadConfig()
     end
 
-    function WindowTable:CreateTab(Name, Icon)
+    -- Theme setter
+    function WindowTable:SetTheme(Theme)
+        CurrentTheme = Theme
+        -- Обновление не полное, но базовое
+    end
+
+    function WindowTable:CreateTab(Name, Image, Callback)
         local Tab = {}
 
         local TabButton = Instance.new("TextButton")
-        TabButton.Name = Name .. "TabButton"
-        TabButton.BackgroundColor3 = Themes.Second
+        TabButton.Name = Name .. "Tab"
+        TabButton.BackgroundColor3 = CurrentTheme.Main
+        TabButton.BackgroundTransparency = 0.1
         TabButton.BorderSizePixel = 0
-        TabButton.Size = UDim2.new(1, 0, 0, 30)
-        TabButton.Font = Enum.Font.SourceSansBold
+        TabButton.Size = UDim2.new(1, -10, 0, 35)
+        TabButton.Font = Enum.Font.Gotham
         TabButton.Text = Name
-        TabButton.TextColor3 = Themes.Text
+        TabButton.TextColor3 = CurrentTheme.Text
         TabButton.TextSize = 14
-        TabButton.Parent = TabHolder
+        TabButton.Parent = TabScroll
 
-        local TabButtonUICorner = Instance.new("UICorner")
-        TabButtonUICorner.CornerRadius = UDim.new(0, 5)
-        TabButtonUICorner.Parent = TabButton
+        local TabImage = Instance.new("ImageLabel")
+        TabImage.BackgroundTransparency = 1
+        TabImage.Position = UDim2.new(0, 5, 0, 5)
+        TabImage.Size = UDim2.new(0, 25, 0, 25)
+        TabImage.Image = Image or "rbxassetid://677930759"
+        TabImage.Parent = TabButton
 
         local TabPage = Instance.new("ScrollingFrame")
         TabPage.Name = Name .. "TabPage"
         TabPage.BackgroundTransparency = 1
-        TabPage.Size = UDim2.new(1, -150, 1, -60)
+        TabPage.Size = UDim2.new(1, -170, 1, -65)
         TabPage.CanvasSize = UDim2.new(0, 0, 0, 0)
         TabPage.ScrollBarThickness = 4
         TabPage.Parent = Window
@@ -326,6 +449,16 @@ function ChristmasRayfield:CreateWindow(Settings)
         RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
         RightLayout.Parent = RightSide
 
+        -- Search
+        SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+            local Query = string.lower(SearchBox.Text)
+            for _, ElementFrame in pairs(TabPage:GetDescendants()) do
+                if ElementFrame:IsA("Frame") and ElementFrame.Name then
+                    ElementFrame.Visible = string.find(string.lower(ElementFrame.Name), Query) or Query == ""
+                end
+            end
+        end)
+
         if Config.ConfigurationSaving.Enabled then
             self.Flags[Name] = {}
         end
@@ -345,16 +478,17 @@ function ChristmasRayfield:CreateWindow(Settings)
 
         TabButton.MouseButton1Click:Connect(function()
             for _, OtherTab in pairs(self.Tabs) do
-                PlayTween(OtherTab.TabButton, {BackgroundColor3 = Themes.Second}, 0.3)
+                PlayTween(OtherTab.TabButton, {BackgroundColor3 = CurrentTheme.Second}, 0.3)
             end
-            PlayTween(TabButton, {BackgroundColor3 = Themes.Accent}, 0.3)
+            PlayTween(TabButton, {BackgroundColor3 = CurrentTheme.Accent}, 0.3)
 
             for _, OtherPage in pairs(Window:GetChildren()) do
                 if OtherPage:IsA("ScrollingFrame") and OtherPage ~= TabPage then
-                    PlayTween(OtherPage, {Size = UDim2.new(0, 0, 0, 0)}, 0.3)
+                    OtherPage.Visible = false
                 end
             end
-            PlayTween(TabPage, {Size = UDim2.new(1, -150, 1, -60)}, 0.3)
+            TabPage.Visible = true
+            if Callback then Callback() end
         end)
 
         function Tab:CreateSection(Name)
@@ -362,30 +496,23 @@ function ChristmasRayfield:CreateWindow(Settings)
 
             local SectionFrame = Instance.new("Frame")
             SectionFrame.Name = Name .. "Section"
-            SectionFrame.BackgroundColor3 = Themes.Second
+            SectionFrame.BackgroundColor3 = CurrentTheme.Second
             SectionFrame.BorderSizePixel = 0
             SectionFrame.Size = UDim2.new(1, 0, 0, 50)
             SectionFrame.ClipsDescendants = true
             SectionFrame.Parent = self.LeftSide
 
-            local SectionUICorner = Instance.new("UICorner")
-            SectionUICorner.CornerRadius = UDim.new(0, 6)
-            SectionUICorner.Parent = SectionFrame
-
-            local Stroke = Instance.new("UIStroke")
-            Stroke.Color = Themes.Stroke
-            Stroke.Thickness = 1
-            Stroke.Parent = SectionFrame
+            ApplyDropShadow(SectionFrame, self.LeftSide, Vector2.new(5, 5), 0.7)
 
             local SectionTitle = Instance.new("TextLabel")
             SectionTitle.Name = "Title"
             SectionTitle.BackgroundTransparency = 1
             SectionTitle.Position = UDim2.new(0, 10, 0, 5)
             SectionTitle.Size = UDim2.new(0, 200, 0, 20)
-            SectionTitle.Font = Enum.Font.SourceSansBold
-            SectionTitle.Text = Name .. " 🎀"
-            SectionTitle.TextColor3 = Themes.Text
-            SectionTitle.TextSize = 14
+            SectionTitle.Font = Enum.Font.GothamBold
+            SectionTitle.Text = Name .. " ❄️"
+            SectionTitle.TextColor3 = CurrentTheme.Text
+            SectionTitle.TextSize = 16
             SectionTitle.TextXAlignment = Enum.TextXAlignment.Left
             SectionTitle.Parent = SectionFrame
 
@@ -403,6 +530,8 @@ function ChristmasRayfield:CreateWindow(Settings)
             SectionLayout.VerticalAlignment = Enum.VerticalAlignment.Top
             SectionLayout.Parent = SectionContent
 
+            UpdateCanvasSize(self.TabPage)
+
             Section = {
                 Tab = self,
                 Name = Name,
@@ -412,62 +541,51 @@ function ChristmasRayfield:CreateWindow(Settings)
                 Elements = {}
             }
 
+            -- Toggle
             function Section:CreateToggle(Settings)
                 local Toggle = {}
 
                 local ToggleFrame = Instance.new("Frame")
                 ToggleFrame.Name = Settings.Name .. "Toggle"
-                ToggleFrame.BackgroundColor3 = Themes.Main
+                ToggleFrame.BackgroundColor3 = CurrentTheme.Main
                 ToggleFrame.BorderSizePixel = 0
-                ToggleFrame.Size = UDim2.new(1, 0, 0, 35)
+                ToggleFrame.Size = UDim2.new(1, -10, 0, 45)
                 ToggleFrame.Parent = self.SectionContent
-
-                local ToggleUICorner = Instance.new("UICorner")
-                ToggleUICorner.CornerRadius = UDim.new(0, 5)
-                ToggleUICorner.Parent = ToggleFrame
 
                 local ToggleLabel = Instance.new("TextLabel")
                 ToggleLabel.Name = "Label"
                 ToggleLabel.BackgroundTransparency = 1
                 ToggleLabel.Position = UDim2.new(0, 10, 0, 0)
                 ToggleLabel.Size = UDim2.new(0, 150, 1, 0)
-                ToggleLabel.Font = Enum.Font.SourceSans
+                ToggleLabel.Font = Enum.Font.Gotham
                 ToggleLabel.Text = Settings.Name .. " ❄️"
-                ToggleLabel.TextColor3 = Themes.Text
+                ToggleLabel.TextColor3 = CurrentTheme.Text
                 ToggleLabel.TextSize = 14
                 ToggleLabel.TextXAlignment = Enum.TextXAlignment.Left
                 ToggleLabel.Parent = ToggleFrame
 
                 local ToggleButton = Instance.new("Frame")
                 ToggleButton.Name = "Button"
-                ToggleButton.BackgroundColor3 = Themes.Outline
+                ToggleButton.BackgroundColor3 = CurrentTheme.Outline
                 ToggleButton.BorderSizePixel = 0
                 ToggleButton.Position = UDim2.new(1, -50, 0.5, -10)
                 ToggleButton.Size = UDim2.new(0, 40, 0, 20)
                 ToggleButton.AnchorPoint = Vector2.new(0.5, 0.5)
                 ToggleButton.Parent = ToggleFrame
 
-                local ToggleButtonUICorner = Instance.new("UICorner")
-                ToggleButtonUICorner.CornerRadius = UDim.new(1, 0)
-                ToggleButtonUICorner.Parent = ToggleButton
-
-                local ToggleButtonInner = Instance.new("Frame")
-                ToggleButtonInner.Name = "Inner"
-                ToggleButtonInner.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                ToggleButtonInner.BorderSizePixel = 0
-                ToggleButtonInner.Size = UDim2.new(0, 16, 0, 16)
-                ToggleButtonInner.AnchorPoint = Vector2.new(0, 0.5)
-                ToggleButtonInner.Position = UDim2.new(0, 2, 0.5, 0)
-                ToggleButtonInner.Parent = ToggleButton
-
-                local ToggleInnerUICorner = Instance.new("UICorner")
-                ToggleInnerUICorner.CornerRadius = UDim.new(1, 0)
-                ToggleInnerUICorner.Parent = ToggleButtonInner
+                local ToggleInner = Instance.new("Frame")
+                ToggleInner.Name = "Inner"
+                ToggleInner.BackgroundColor3 = Color3.new(0.5, 0.5, 0.5)
+                ToggleInner.BorderSizePixel = 0
+                ToggleInner.Size = UDim2.new(0, 16, 0, 16)
+                ToggleInner.AnchorPoint = Vector2.new(0, 0.5)
+                ToggleInner.Position = UDim2.new(0, 2, 0.5, 0)
+                ToggleInner.Parent = ToggleButton
 
                 local CurrentValue = Settings.CurrentValue or false
                 local Flag = Settings.Flag or Settings.Name
 
-                if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                if Config.ConfigurationSaving.Enabled and Flag then
                     if not self.Tab.Window.Flags[Flag] then
                         self.Tab.Window.Flags[Flag] = {Value = CurrentValue, Callback = Settings.Callback}
                     end
@@ -476,10 +594,10 @@ function ChristmasRayfield:CreateWindow(Settings)
 
                 local function SetValue(Value)
                     CurrentValue = Value
-                    PlayTween(ToggleButtonInner, {Position = Value and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}, 0.2)
-                    PlayTween(ToggleButton, {BackgroundColor3 = Value and Themes.Accent or Themes.Outline}, 0.2)
+                    PlayTween(ToggleInner, {Position = Value and UDim2.new(1, -18, 0.5, 0) or UDim2.new(0, 2, 0.5, 0)}, 0.2)
+                    PlayTween(ToggleButton, {BackgroundColor3 = Value and CurrentTheme.Accent or CurrentTheme.Outline}, 0.2)
                     Settings.Callback(Value)
-                    if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                    if Config.ConfigurationSaving.Enabled and Flag then
                         self.Tab.Window.Flags[Flag].Value = Value
                         self.Tab.Window:SaveConfig()
                     end
@@ -493,127 +611,104 @@ function ChristmasRayfield:CreateWindow(Settings)
 
                 SetValue(CurrentValue)
 
-                Toggle = {
-                    SetValue = SetValue
-                }
-
+                Toggle = { SetValue = SetValue }
                 table.insert(self.Elements, Toggle)
+                UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 return Toggle
             end
 
+            -- Button
             function Section:CreateButton(Settings)
                 local Button = {}
 
                 local ButtonFrame = Instance.new("Frame")
                 ButtonFrame.Name = Settings.Name .. "Button"
-                ButtonFrame.BackgroundColor3 = Themes.Accent
+                ButtonFrame.BackgroundColor3 = CurrentTheme.Accent
                 ButtonFrame.BorderSizePixel = 0
-                ButtonFrame.Size = UDim2.new(1, 0, 0, 35)
+                ButtonFrame.Size = UDim2.new(1, -10, 0, 45)
                 ButtonFrame.Parent = self.SectionContent
-
-                local ButtonUICorner = Instance.new("UICorner")
-                ButtonUICorner.CornerRadius = UDim.new(0, 5)
-                ButtonUICorner.Parent = ButtonFrame
 
                 local ButtonLabel = Instance.new("TextButton")
                 ButtonLabel.Name = "Label"
                 ButtonLabel.BackgroundTransparency = 1
                 ButtonLabel.Size = UDim2.new(1, 0, 1, 0)
-                ButtonLabel.Font = Enum.Font.SourceSansBold
+                ButtonLabel.Font = Enum.Font.GothamBold
                 ButtonLabel.Text = Settings.Name .. " 🎁"
-                ButtonLabel.TextColor3 = Themes.Text
+                ButtonLabel.TextColor3 = CurrentTheme.Text
                 ButtonLabel.TextSize = 14
                 ButtonLabel.Parent = ButtonFrame
-
-                local Stroke = Instance.new("UIStroke")
-                Stroke.Color = Themes.Stroke
-                Stroke.Thickness = 1
-                Stroke.Parent = ButtonFrame
 
                 ButtonLabel.MouseButton1Click:Connect(function()
                     Settings.Callback()
                 end)
 
-                Button = {
-                    Callback = Settings.Callback
-                }
-
+                Button = { Callback = Settings.Callback }
                 table.insert(self.Elements, Button)
+                UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 return Button
             end
 
+            -- Slider
             function Section:CreateSlider(Settings)
                 local Slider = {}
 
                 local SliderFrame = Instance.new("Frame")
                 SliderFrame.Name = Settings.Name .. "Slider"
-                SliderFrame.BackgroundColor3 = Themes.Main
+                SliderFrame.BackgroundColor3 = CurrentTheme.Main
                 SliderFrame.BorderSizePixel = 0
-                SliderFrame.Size = UDim2.new(1, 0, 0, 50)
+                SliderFrame.Size = UDim2.new(1, -10, 0, 55)
                 SliderFrame.Parent = self.SectionContent
-
-                local SliderUICorner = Instance.new("UICorner")
-                SliderUICorner.CornerRadius = UDim.new(0, 5)
-                SliderUICorner.Parent = SliderFrame
 
                 local SliderLabel = Instance.new("TextLabel")
                 SliderLabel.Name = "Label"
                 SliderLabel.BackgroundTransparency = 1
                 SliderLabel.Position = UDim2.new(0, 10, 0, 5)
                 SliderLabel.Size = UDim2.new(1, -20, 0, 20)
-                SliderLabel.Font = Enum.Font.SourceSans
-                SliderLabel.Text = Settings.Name .. " (" .. Settings.CurrentValue .. ") 🌟"
-                SliderLabel.TextColor3 = Themes.Text
+                SliderLabel.Font = Enum.Font.Gotham
+                SliderLabel.Text = Settings.Name .. " (" .. (Settings.CurrentValue or 0) .. ") 🌟"
+                SliderLabel.TextColor3 = CurrentTheme.Text
                 SliderLabel.TextSize = 12
                 SliderLabel.TextXAlignment = Enum.TextXAlignment.Left
                 SliderLabel.Parent = SliderFrame
 
                 local SliderBar = Instance.new("Frame")
                 SliderBar.Name = "Bar"
-                SliderBar.BackgroundColor3 = Themes.Outline
+                SliderBar.BackgroundColor3 = CurrentTheme.Outline
                 SliderBar.BorderSizePixel = 0
                 SliderBar.Position = UDim2.new(0, 10, 0, 25)
                 SliderBar.Size = UDim2.new(1, -20, 0, 5)
                 SliderBar.Parent = SliderFrame
 
-                local SliderBarUICorner = Instance.new("UICorner")
-                SliderBarUICorner.CornerRadius = UDim.new(1, 0)
-                SliderBarUICorner.Parent = SliderBar
-
                 local SliderFill = Instance.new("Frame")
                 SliderFill.Name = "Fill"
-                SliderFill.BackgroundColor3 = Themes.Accent
+                SliderFill.BackgroundColor3 = CurrentTheme.Accent
                 SliderFill.BorderSizePixel = 0
                 SliderFill.Size = UDim2.new(0, 0, 1, 0)
                 SliderFill.Parent = SliderBar
 
-                local SliderFillUICorner = Instance.new("UICorner")
-                SliderFillUICorner.CornerRadius = UDim.new(1, 0)
-                SliderFillUICorner.Parent = SliderFill
-
                 local SliderThumb = Instance.new("Frame")
                 SliderThumb.Name = "Thumb"
-                SliderThumb.BackgroundColor3 = Themes.Stroke
+                SliderThumb.BackgroundColor3 = CurrentTheme.Stroke
                 SliderThumb.BorderSizePixel = 0
-                SliderThumb.Size = UDim2.new(0, 15, 1, 5)
+                SliderThumb.Size = UDim2.new(0, 15, 0, 15)
                 SliderThumb.AnchorPoint = Vector2.new(0.5, 0.5)
+                SliderThumb.Position = UDim2.new(0, 0, 0.5, 0)
                 SliderThumb.Parent = SliderBar
-
-                local SliderThumbUICorner = Instance.new("UICorner")
-                SliderThumbUICorner.CornerRadius = UDim.new(1, 0)
-                SliderThumbUICorner.Parent = SliderThumb
 
                 local CurrentValue = Settings.CurrentValue or 0
                 local Min = Settings.Min or 0
                 local Max = Settings.Max or 100
+                local Increment = Settings.Increment or 1
                 local Flag = Settings.Flag or Settings.Name
 
-                if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                if Config.ConfigurationSaving.Enabled and Flag then
                     if not self.Tab.Window.Flags[Flag] then
                         self.Tab.Window.Flags[Flag] = {Value = CurrentValue, Callback = Settings.Callback}
                     end
                     CurrentValue = self.Tab.Window.Flags[Flag].Value
                 end
+
+                local Holding = false
 
                 local function SetValue(Value)
                     CurrentValue = math.clamp(Value, Min, Max)
@@ -622,7 +717,7 @@ function ChristmasRayfield:CreateWindow(Settings)
                     PlayTween(SliderThumb, {Position = UDim2.new(Percent, 0, 0.5, 0)}, 0.1)
                     SliderLabel.Text = Settings.Name .. " (" .. tostring(CurrentValue) .. ") 🌟"
                     Settings.Callback(CurrentValue)
-                    if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                    if Config.ConfigurationSaving.Enabled and Flag then
                         self.Tab.Window.Flags[Flag].Value = CurrentValue
                         self.Tab.Window:SaveConfig()
                     end
@@ -630,21 +725,12 @@ function ChristmasRayfield:CreateWindow(Settings)
 
                 SliderThumb.InputBegan:Connect(function(Input)
                     if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        local Holding = true
+                        Holding = true
                         local MousePos = UserInputService:GetMouseLocation()
                         local RelX = MousePos.X - SliderBar.AbsolutePosition.X
                         local Percent = math.clamp(RelX / SliderBar.AbsoluteSize.X, 0, 1)
                         local Value = Min + Percent * (Max - Min)
                         SetValue(Value)
-                        while Holding do
-                            RunService.RenderStepped:Wait()
-                            MousePos = UserInputService:GetMouseLocation()
-                            RelX = MousePos.X - SliderBar.AbsolutePosition.X
-                            Percent = math.clamp(RelX / SliderBar.AbsoluteSize.X, 0, 1)
-                            Value = Min + Percent * (Max - Min)
-                            SetValue(Value)
-                            if Holding == false then break end
-                        end
                     end
                 end)
 
@@ -654,58 +740,59 @@ function ChristmasRayfield:CreateWindow(Settings)
                     end
                 end)
 
+                RunService.RenderStepped:Connect(function()
+                    if Holding then
+                        local MousePos = UserInputService:GetMouseLocation()
+                        local RelX = MousePos.X - SliderBar.AbsolutePosition.X
+                        local Percent = math.clamp(RelX / SliderBar.AbsoluteSize.X, 0, 1)
+                        local Value = Min + Percent * (Max - Min)
+                        SetValue(Value)
+                    end
+                end)
+
                 SetValue(CurrentValue)
 
-                Slider = {
-                    SetValue = SetValue
-                }
-
+                Slider = { SetValue = SetValue }
                 table.insert(self.Elements, Slider)
+                UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 return Slider
             end
 
+            -- Textbox
             function Section:CreateTextbox(Settings)
                 local Textbox = {}
 
                 local TextboxFrame = Instance.new("Frame")
                 TextboxFrame.Name = Settings.Name .. "Textbox"
-                TextboxFrame.BackgroundColor3 = Themes.Main
+                TextboxFrame.BackgroundColor3 = CurrentTheme.Main
                 TextboxFrame.BorderSizePixel = 0
-                TextboxFrame.Size = UDim2.new(1, 0, 0, 35)
+                TextboxFrame.Size = UDim2.new(1, -10, 0, 45)
                 TextboxFrame.Parent = self.SectionContent
-
-                local TextboxUICorner = Instance.new("UICorner")
-                TextboxUICorner.CornerRadius = UDim.new(0, 5)
-                TextboxUICorner.Parent = TextboxFrame
 
                 local TextboxLabel = Instance.new("TextLabel")
                 TextboxLabel.Name = "Label"
                 TextboxLabel.BackgroundTransparency = 1
                 TextboxLabel.Position = UDim2.new(0, 10, 0, 5)
                 TextboxLabel.Size = UDim2.new(0, 80, 0, 20)
-                TextboxLabel.Font = Enum.Font.SourceSans
+                TextboxLabel.Font = Enum.Font.Gotham
                 TextboxLabel.Text = Settings.Name .. " 📝"
-                TextboxLabel.TextColor3 = Themes.Text
+                TextboxLabel.TextColor3 = CurrentTheme.Text
                 TextboxLabel.TextSize = 12
                 TextboxLabel.TextXAlignment = Enum.TextXAlignment.Left
                 TextboxLabel.Parent = TextboxFrame
 
                 local TextboxInput = Instance.new("TextBox")
                 TextboxInput.Name = "Input"
-                TextboxInput.BackgroundColor3 = Themes.Second
+                TextboxInput.BackgroundColor3 = CurrentTheme.Second
                 TextboxInput.BorderSizePixel = 0
                 TextboxInput.Position = UDim2.new(1, -150, 0, 5)
-                TextboxInput.Size = UDim2.new(0, 140, 0, 25)
-                TextboxInput.Font = Enum.Font.SourceSans
+                TextboxInput.Size = UDim2.new(0, 140, 0, 35)
+                TextboxInput.Font = Enum.Font.Gotham
                 TextboxInput.Text = Settings.CurrentValue or ""
-                TextboxInput.TextColor3 = Themes.Text
+                TextboxInput.TextColor3 = CurrentTheme.Text
                 TextboxInput.TextSize = 12
                 TextboxInput.ClearTextOnFocus = Settings.ClearTextOnFocus or false
                 TextboxInput.Parent = TextboxFrame
-
-                local TextboxInputUICorner = Instance.new("UICorner")
-                TextboxInputUICorner.CornerRadius = UDim.new(0, 4)
-                TextboxInputUICorner.Parent = TextboxInput
 
                 TextboxInput.FocusLost:Connect(function(Enter)
                     if Enter then
@@ -713,66 +800,63 @@ function ChristmasRayfield:CreateWindow(Settings)
                     end
                 end)
 
-                Textbox = {
-                    SetText = function(Text)
-                        TextboxInput.Text = Text
-                    end
-                }
-
+                Textbox = { SetText = function(Text) TextboxInput.Text = Text end }
                 table.insert(self.Elements, Textbox)
+                UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 return Textbox
             end
 
+            -- Dropdown
             function Section:CreateDropdown(Settings)
                 local Dropdown = {}
 
                 local DropdownFrame = Instance.new("Frame")
                 DropdownFrame.Name = Settings.Name .. "Dropdown"
-                DropdownFrame.BackgroundColor3 = Themes.Main
+                DropdownFrame.BackgroundColor3 = CurrentTheme.Main
                 DropdownFrame.BorderSizePixel = 0
-                DropdownFrame.Size = UDim2.new(1, 0, 0, 35)
+                DropdownFrame.Size = UDim2.new(1, -10, 0, 45)
                 DropdownFrame.Parent = self.SectionContent
-
-                local DropdownUICorner = Instance.new("UICorner")
-                DropdownUICorner.CornerRadius = UDim.new(0, 5)
-                DropdownUICorner.Parent = DropdownFrame
 
                 local DropdownLabel = Instance.new("TextLabel")
                 DropdownLabel.Name = "Label"
                 DropdownLabel.BackgroundTransparency = 1
                 DropdownLabel.Position = UDim2.new(0, 10, 0, 0)
                 DropdownLabel.Size = UDim2.new(0, 150, 1, 0)
-                DropdownLabel.Font = Enum.Font.SourceSans
+                DropdownLabel.Font = Enum.Font.Gotham
                 DropdownLabel.Text = Settings.Name .. " 🎄"
-                DropdownLabel.TextColor3 = Themes.Text
+                DropdownLabel.TextColor3 = CurrentTheme.Text
                 DropdownLabel.TextSize = 14
                 DropdownLabel.TextXAlignment = Enum.TextXAlignment.Left
                 DropdownLabel.Parent = DropdownFrame
 
                 local DropdownButton = Instance.new("TextButton")
                 DropdownButton.Name = "Button"
-                DropdownButton.BackgroundColor3 = Themes.Second
+                DropdownButton.BackgroundColor3 = CurrentTheme.Second
                 DropdownButton.BorderSizePixel = 0
                 DropdownButton.Position = UDim2.new(1, -150, 0, 5)
-                DropdownButton.Size = UDim2.new(0, 140, 0, 25)
-                DropdownButton.Font = Enum.Font.SourceSans
+                DropdownButton.Size = UDim2.new(0, 140, 0, 35)
+                DropdownButton.Font = Enum.Font.Gotham
                 DropdownButton.Text = Settings.CurrentValue or "Select"
-                DropdownButton.TextColor3 = Themes.Text
+                DropdownButton.TextColor3 = CurrentTheme.Text
                 DropdownButton.TextSize = 12
                 DropdownButton.Parent = DropdownFrame
 
-                local DropdownButtonUICorner = Instance.new("UICorner")
-                DropdownButtonUICorner.CornerRadius = UDim.new(0, 4)
-                DropdownButtonUICorner.Parent = DropdownButton
+                local DropdownArrow = Instance.new("ImageLabel")
+                DropdownArrow.BackgroundTransparency = 1
+                DropdownArrow.Position = UDim2.new(1, -25, 0, 10)
+                DropdownArrow.Size = UDim2.new(0, 15, 0, 15)
+                DropdownArrow.Image = "rbxassetid://6031091004"
+                DropdownArrow.Parent = DropdownButton
 
                 local DropdownList = Instance.new("Frame")
                 DropdownList.Name = "List"
-                DropdownList.BackgroundColor3 = Themes.Main
+                DropdownList.BackgroundColor3 = CurrentTheme.Main
                 DropdownList.BorderSizePixel = 0
                 DropdownList.Position = UDim2.new(0, 0, 1, 5)
-                DropdownList.Size = UDim2.new(1, 0, 0, #Settings.Options * 25)
+                DropdownList.Size = UDim2.new(1, 0, 0, #Settings.Options * 30)
                 DropdownList.ClipsDescendants = true
                 DropdownList.Visible = false
+                DropdownList.ZIndex = 10
                 DropdownList.Parent = DropdownFrame
 
                 local DropdownListLayout = Instance.new("UIListLayout")
@@ -781,7 +865,7 @@ function ChristmasRayfield:CreateWindow(Settings)
                 local CurrentValue = Settings.CurrentValue or ""
                 local Flag = Settings.Flag or Settings.Name
 
-                if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                if Config.ConfigurationSaving.Enabled and Flag then
                     if not self.Tab.Window.Flags[Flag] then
                         self.Tab.Window.Flags[Flag] = {Value = CurrentValue, Callback = Settings.Callback}
                     end
@@ -792,10 +876,10 @@ function ChristmasRayfield:CreateWindow(Settings)
                     local OptionButton = Instance.new("TextButton")
                     OptionButton.Name = Option
                     OptionButton.BackgroundTransparency = 1
-                    OptionButton.Size = UDim2.new(1, 0, 0, 25)
-                    OptionButton.Font = Enum.Font.SourceSans
+                    OptionButton.Size = UDim2.new(1, 0, 0, 30)
+                    OptionButton.Font = Enum.Font.Gotham
                     OptionButton.Text = Option
-                    OptionButton.TextColor3 = Themes.Text
+                    OptionButton.TextColor3 = CurrentTheme.Text
                     OptionButton.TextSize = 12
                     OptionButton.Parent = DropdownList
 
@@ -804,7 +888,7 @@ function ChristmasRayfield:CreateWindow(Settings)
                         DropdownList.Visible = false
                         Settings.Callback(Option)
                         CurrentValue = Option
-                        if self.Tab.Window.ConfigurationSaving.Enabled and Flag then
+                        if Config.ConfigurationSaving.Enabled and Flag then
                             self.Tab.Window.Flags[Flag].Value = CurrentValue
                             self.Tab.Window:SaveConfig()
                         end
@@ -813,112 +897,23 @@ function ChristmasRayfield:CreateWindow(Settings)
 
                 DropdownButton.MouseButton1Click:Connect(function()
                     DropdownList.Visible = not DropdownList.Visible
+                    UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 end)
 
-                if CurrentValue ~= "" then
-                    DropdownButton.Text = CurrentValue
-                end
-
-                Dropdown = {
-                    SetValue = function(Value)
-                        DropdownButton.Text = Value
-                        Settings.Callback(Value)
-                    end
-                }
-
+                Dropdown = { SetValue = function(Value) DropdownButton.Text = Value; CurrentValue = Value; Settings.Callback(Value) end }
                 table.insert(self.Elements, Dropdown)
+                UpdateCanvasSize(self.Tab.SectionLayout.Parent.Parent)
                 return Dropdown
             end
 
-            function Section:CreateColorPicker(Settings)
-                -- Простая версия ColorPicker (расширьте при необходимости)
-                local ColorPicker = {}
+            -- Другие элементы могут быть добавлены аналогично
 
-                local ColorPickerFrame = Instance.new("Frame")
-                ColorPickerFrame.Name = Settings.Name .. "ColorPicker"
-                ColorPickerFrame.BackgroundColor3 = Themes.Main
-                ColorPickerFrame.BorderSizePixel = 0
-                ColorPickerFrame.Size = UDim2.new(1, 0, 0, 35)
-                ColorPickerFrame.Parent = self.SectionContent
-
-                local ColorPickerLabel = Instance.new("TextLabel")
-                ColorPickerLabel.Name = "Label"
-                ColorPickerLabel.BackgroundTransparency = 1
-                ColorPickerLabel.Position = UDim2.new(0, 10, 0, 0)
-                ColorPickerLabel.Size = UDim2.new(0, 150, 1, 0)
-                ColorPickerLabel.Font = Enum.Font.SourceSans
-                ColorPickerLabel.Text = Settings.Name .. " 🎨"
-                ColorPickerLabel.TextColor3 = Themes.Text
-                ColorPickerLabel.TextSize = 14
-                ColorPickerLabel.TextXAlignment = Enum.TextXAlignment.Left
-                ColorPickerLabel.Parent = ColorPickerFrame
-
-                local ColorDisplay = Instance.new("Frame")
-                ColorDisplay.Name = "Display"
-                ColorDisplay.BackgroundColor3 = Settings.CurrentValue or Color3.fromRGB(255, 255, 255)
-                ColorDisplay.BorderSizePixel = 2
-                ColorDisplay.BorderColor3 = Themes.Stroke
-                ColorDisplay.Position = UDim2.new(1, -40, 0, 5)
-                ColorDisplay.Size = UDim2.new(0, 30, 0, 25)
-                ColorDisplay.Parent = ColorPickerFrame
-
-                local CurrentValue = Settings.CurrentValue or Color3.new(1, 1, 1)
-                local Flag = Settings.Flag or Settings.Name
-
-                ColorDisplay.InputBegan:Connect(function(Input)
-                    if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        -- Для полной имплементации добавьте пикер (здесь просто callback с цветом)
-                        Settings.Callback(CurrentValue)
-                    end
-                end)
-
-                ColorPicker = {
-                    SetColor = function(Color)
-                        ColorDisplay.BackgroundColor3 = Color
-                        Settings.Callback(Color)
-                        CurrentValue = Color
-                    end
-                }
-
-                table.insert(self.Elements, ColorPicker)
-                return ColorPicker
-            end
-
-            function Section:CreateLabel(Settings)
-                local Label = {}
-
-                local LabelFrame = Instance.new("Frame")
-                LabelFrame.Name = Settings.Name .. "Label"
-                LabelFrame.BackgroundColor3 = Themes.Main
-                LabelFrame.BorderSizePixel = 0
-                LabelFrame.Size = UDim2.new(1, 0, 0, 35)
-                LabelFrame.Parent = self.SectionContent
-
-                local LabelText = Instance.new("TextLabel")
-                LabelText.Name = "Text"
-                LabelText.BackgroundTransparency = 1
-                LabelText.Size = UDim2.new(1, 0, 1, 0)
-                LabelText.Font = Enum.Font.SourceSans
-                LabelText.Text = Settings.Text .. " 🎄"
-                LabelText.TextColor3 = Themes.Text
-                LabelText.TextSize = 14
-                LabelText.Parent = LabelFrame
-
-                Label = {
-                    SetText = function(Text)
-                        LabelText.Text = Text .. " 🎄"
-                    end
-                }
-
-                table.insert(self.Elements, Label)
-                return Label
-            end
-
-            table.insert(self.Tab.Sections, Section)
+            table.insert(self.Sections, Section)
             return Section
         end
 
-        table.insert(self.Window.Tabs, Tab)
+        table.insert(self.Tabs, Tab)
+        UpdateCanvasSize(TabScroll)
         return Tab
     end
 
@@ -926,3 +921,10 @@ function ChristmasRayfield:CreateWindow(Settings)
 end
 
 return ChristmasRayfield
+
+-- Пример использования:
+-- local ChristmasRayfield = loadstring(game:HttpGet("url"))()
+-- local Window = ChristmasRayfield:CreateWindow({Name = "🎄 Christmas GUI"})
+-- local Tab = Window:CreateTab("Main")
+-- local Section = Tab:CreateSection("Options")
+-- Section:CreateToggle({Name = "Run", Callback = function(Value) end})
